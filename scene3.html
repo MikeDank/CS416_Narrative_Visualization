@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scene 3: CO2 Emissions vs Population</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-annotation/2.5.1/d3-annotation.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .tooltip { position: absolute; background-color: white; border: 1px solid #ddd; padding: 10px; display: none; }
+        button { margin: 5px; }
+        .annotation { font-size: 14px; fill: #333; }
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            10%, 90% { opacity: 1; }
+        }
+        .animated-text {
+            animation: fadeInOut 10s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h1>Education and Environmental Impact: A Global Perspective</h1>
+    </div>
+    <nav>
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="scene1.html">Scene 1</a></li>
+            <li><a href="scene2.html">Scene 2</a></li>
+            <li><a href="scene3.html">Scene 3</a></li>
+        </ul>
+    </nav>
+    <main role="main">
+        <h2>Scene 3: CO2 Emissions vs Population</h2>
+        <div id="annotation" class="animated-text" style="text-align: center; margin: 10px 0;">
+            Hover over the bubbles to view Country, Population, Urban Population, Density, and CO2 Emissions
+        </div>
+        <div id="chart"></div>
+    </main>
+    <footer>Created for Data Visualization Course Project</footer>
+    <script src="main.js"></script>
+    <script>
+        const margin = {top: 50, right: 200, bottom: 50, left: 70};
+        const width = 800 - margin.left - margin.right;
+        const height = 500 - margin.top - margin.bottom;
+
+        const svg = d3.select("#chart")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip");
+
+        const xScale = d3.scaleLog().range([0, width]);
+        const yScale = d3.scaleLog().range([height, 0]);
+        const sizeScale = d3.scaleSqrt().range([4, 40]);
+        const colorScale = d3.scaleSequential(d3.interpolateViridis);
+
+        const xAxis = d3.axisBottom(xScale).ticks(5).tickFormat(d3.format(".0s"));
+        const yAxis = d3.axisLeft(yScale).ticks(5).tickFormat(d3.format(".0s"));
+
+        const xAxisGroup = svg.append("g")
+            .attr("transform", `translate(0,${height})`)
+            .attr("class", "x-axis");
+
+        const yAxisGroup = svg.append("g")
+            .attr("class", "y-axis");
+
+        svg.append("text")
+            .attr("text-anchor", "middle")
+            .attr("x", width / 2)
+            .attr("y", height + margin.bottom - 10)
+            .text("Population");
+
+        svg.append("text")
+            .attr("text-anchor", "middle")
+            .attr("transform", "rotate(-90)")
+            .attr("x", -height / 2)
+            .attr("y", -margin.left + 20)
+            .text("CO2 Emissions (kt)");
+
+        d3.csv("world-data-2023 2.csv").then(function(data) {
+            data = data.map(d => ({
+                ...d,
+                "Co2-Emissions": +d["Co2-Emissions"].replace(/,/g, ''),
+                "Population": +d["Population"].replace(/,/g, ''),
+                "Urban_population": +d["Urban_population"].replace(/,/g, ''),
+                "Density": +d["Density\n(P/Km2)"]
+            })).filter(d => d["Co2-Emissions"] > 0 && d["Population"] > 0 && d["Urban_population"] > 0 && d["Density"] > 0);
+
+            xScale.domain(d3.extent(data, d => d["Population"])).nice();
+            yScale.domain(d3.extent(data, d => d["Co2-Emissions"])).nice();
+            sizeScale.domain(d3.extent(data, d => d["Urban_population"])).nice();
+            colorScale.domain(d3.extent(data, d => d["Density"]));
+
+            xAxisGroup.call(xAxis);
+            yAxisGroup.call(yAxis);
+
+            svg.selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("cx", d => xScale(d["Population"]))
+                .attr("cy", d => yScale(d["Co2-Emissions"]))
+                .attr("r", d => sizeScale(d["Urban_population"]))
+                .attr("fill", d => colorScale(d["Density"]))
+                .attr("opacity", 0.7)
+                .on("mouseover", function(event, d) {
+                    tooltip.style("display", "block")
+                        .html(`Country: ${d.Country}<br>
+                               Population: ${d["Population"].toLocaleString()}<br>
+                               Urban Population: ${d["Urban_population"].toLocaleString()}<br>
+                               Density: ${d["Density"].toLocaleString()} people/km²<br>
+                               CO2 Emissions: ${d["Co2-Emissions"].toLocaleString()} kt`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.style("display", "none");
+                });
+
+            // Add legend
+            const legend = svg.append("g")
+                .attr("transform", `translate(${width}, 0)`);
+
+            legend.append("text")
+                .attr("class", "legend-title")
+                .attr("x", 0)
+                .attr("y", -10)
+                .style("font-weight", "bold")
+                .text("Population Density");
+
+            const legendGradient = legend.append("defs")
+                .append("linearGradient")
+                .attr("id", "legendGradient")
+                .attr("x1", "0%")
+                .attr("x2", "0%")
+                .attr("y1", "100%")
+                .attr("y2", "0%");
+
+            legendGradient.selectAll("stop")
+                .data(colorScale.ticks().map((t, i, n) => ({ offset: `${100*i/n.length}%`, color: colorScale(t) })))
+                .enter().append("stop")
+                .attr("offset", d => d.offset)
+                .attr("stop-color", d => d.color);
+
+            legend.append("rect")
+                .attr("x", 0)
+                .attr("y", 0)
+                .attr("width", 20)
+                .attr("height", 150)
+                .style("fill", "url(#legendGradient)");
+
+            const legendScale = d3.scaleLinear()
+                .domain(colorScale.domain())
+                .range([150, 0]);
+
+            const legendAxis = d3.axisRight(legendScale)
+                .ticks(5)
+                .tickFormat(d3.format(".0s"));
+
+            legend.append("g")
+                .attr("transform", "translate(20, 0)")
+                .call(legendAxis);
+
+            // Add size legend
+            const sizeLegend = svg.append("g")
+                .attr("transform", `translate(${width}, 200)`);
+
+            sizeLegend.append("text")
+                .attr("class", "legend-title")
+                .attr("x", 0)
+                .attr("y", -10)
+                .style("font-weight", "bold")
+                .text("Urban Population");
+
+            const sizeLegendData = [1e6, 10e6, 100e6];
+
+            sizeLegend.selectAll("circle")
+                .data(sizeLegendData)
+                .enter()
+                .append("circle")
+                .attr("cx", 10)
+                .attr("cy", (d, i) => i * 50 + 20)
+                .attr("r", d => sizeScale(d))
+                .attr("fill", "none")
+                .attr("stroke", "black");
+
+            sizeLegend.selectAll("text")
+                .data(sizeLegendData)
+                .enter()
+                .append("text")
+                .attr("x", 25)
+                .attr("y", (d, i) => i * 50 + 20)
+                .attr("dy", "0.3em")
+                .text(d => d3.format(".0s")(d));
+        });
+    </script>
+</body>
+</html>
